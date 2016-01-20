@@ -1,6 +1,7 @@
 import contextlib
 import sys
 from operator import attrgetter
+import warnings
 from urllib import parse
 
 from django.core.exceptions import ImproperlyConfigured, ObjectDoesNotExist
@@ -110,10 +111,11 @@ class RelatedField(Field):
                 'Relational field must provide a `queryset` argument, '
                 'override `get_queryset`, or set read_only=`True`.'
             )
-        assert not (self.queryset is not None and kwargs.get('read_only')), (
-            'Relational fields should not provide a `queryset` argument, '
-            'when setting read_only=`True`.'
-        )
+        if self.queryset is not None and kwargs.get('read_only'):
+            warnings.warn(
+                'Relational fields should not provide a `queryset` argument, '
+                'when setting read_only=`True`.'
+            )
         kwargs.pop('many', None)
         kwargs.pop('allow_empty', None)
         super().__init__(**kwargs)
