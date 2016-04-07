@@ -21,7 +21,7 @@ def get_object_or_404(queryset, *filter_args, **filter_kwargs):
         raise Http404
 
 
-class GenericAPIView(views.APIView):
+class GenericAPIView(mixins.PaginationMixin, views.APIView):
     """
     Base class for all other generic views.
     """
@@ -153,33 +153,6 @@ class GenericAPIView(views.APIView):
         for backend in list(self.filter_backends):
             queryset = backend().filter_queryset(self.request, queryset, self)
         return queryset
-
-    @property
-    def paginator(self):
-        """
-        The paginator instance associated with the view, or `None`.
-        """
-        if not hasattr(self, '_paginator'):
-            if self.pagination_class is None:
-                self._paginator = None
-            else:
-                self._paginator = self.pagination_class()
-        return self._paginator
-
-    def paginate_queryset(self, queryset):
-        """
-        Return a single page of results, or `None` if pagination is disabled.
-        """
-        if self.paginator is None:
-            return None
-        return self.paginator.paginate_queryset(queryset, self.request, view=self)
-
-    def get_paginated_response(self, data):
-        """
-        Return a paginated style `Response` object for the given output data.
-        """
-        assert self.paginator is not None
-        return self.paginator.get_paginated_response(data)
 
 
 # Concrete view classes that provide method handlers
