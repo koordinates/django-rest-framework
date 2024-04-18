@@ -42,6 +42,14 @@ class GenericAPIView(mixins.PaginationMixin, views.APIView):
     # The filter backend classes to use for queryset filtering
     filter_backends = api_settings.DEFAULT_FILTER_BACKENDS
 
+
+    # The style to use for queryset pagination.
+    pagination_class = api_settings.DEFAULT_PAGINATION_CLASS
+
+    # Allow generic typing checking for generic views.
+    def __class_getitem__(cls, *args, **kwargs):
+        return cls
+
     def get_queryset(self):
         """
         Get the list of items for this view.

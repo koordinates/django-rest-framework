@@ -1,15 +1,10 @@
 import os
-import sys
 
 import django
 from django.core import management
 
 
 def pytest_addoption(parser):
-    parser.addoption('--no-pkgroot', action='store_true', default=False,
-                     help='Remove package root directory from sys.path, ensuring that '
-                          'rest_framework is imported from the installed site-packages. '
-                          'Used for testing the distribution.')
     parser.addoption('--staticfiles', action='store_true', default=False,
                      help='Run tests with static files collection, using manifest '
                           'staticfiles storage. Used for testing the distribution.')
@@ -18,6 +13,8 @@ def pytest_addoption(parser):
 def pytest_configure(config):
     from django.conf import settings
 
+    # USE_L10N is deprecated, and will be removed in Django 5.0.
+    use_l10n = {"USE_L10N": True} if django.VERSION < (4, 0) else {}
     settings.configure(
         DEBUG_PROPAGATE_EXCEPTIONS=True,
         DATABASES={
@@ -33,7 +30,6 @@ def pytest_configure(config):
         SITE_ID=1,
         SECRET_KEY='not very secret in tests',
         USE_I18N=True,
-        USE_L10N=True,
         STATIC_URL='/static/',
         ROOT_URLCONF='tests.urls',
         TEMPLATES=[
@@ -68,6 +64,7 @@ def pytest_configure(config):
         PASSWORD_HASHERS=(
             'django.contrib.auth.hashers.MD5PasswordHasher',
         ),
+        **use_l10n,
     )
 
     # guardian is optional
@@ -85,19 +82,15 @@ def pytest_configure(config):
             'guardian',
         )
 
-    if config.getoption('--no-pkgroot'):
-        sys.path.pop(0)
-
-        # import rest_framework before pytest re-adds the package root directory.
-        import rest_framework
-        package_dir = os.path.join(os.getcwd(), 'rest_framework')
-        assert not rest_framework.__file__.startswith(package_dir)
-
     # Manifest storage will raise an exception if static files are not present (ie, a packaging failure).
     if config.getoption('--staticfiles'):
         import rest_framework
         settings.STATIC_ROOT = os.path.join(os.path.dirname(rest_framework.__file__), 'static-root')
-        settings.STATICFILES_STORAGE = 'django.contrib.staticfiles.storage.ManifestStaticFilesStorage'
+        backend = 'django.contrib.staticfiles.storage.ManifestStaticFilesStorage'
+        if django.VERSION < (4, 2):
+            settings.STATICFILES_STORAGE = backend
+        else:
+            settings.STORAGES['staticfiles']['BACKEND'] = backend
 
     django.setup()
 

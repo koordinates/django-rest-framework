@@ -9,6 +9,23 @@ source:
 >
 > &mdash; Heroku, [JSON Schema for the Heroku Platform API][cite]
 
+---
+
+**Deprecation notice:**
+
+REST framework's built-in support for generating OpenAPI schemas is
+**deprecated** in favor of 3rd party packages that can provide this
+functionality instead. The built-in support will be moved into a separate
+package and then subsequently retired over the next releases.
+
+As a full-fledged replacement, we recommend the [drf-spectacular] package.
+It has extensive support for generating OpenAPI 3 schemas from
+REST framework APIs, with both automatic and customisable options available.
+For further information please refer to
+[Documenting your API](../topics/documenting-your-api.md#drf-spectacular).
+
+---
+
 API schemas are a useful tool that allow for a range of use cases, including
 generating reference documentation, or driving dynamic client libraries that
 can interact with your API.
@@ -39,10 +56,11 @@ The following sections explain more.
 
 ### Install dependencies
 
-    pip install pyyaml uritemplate
+    pip install pyyaml uritemplate inflection
 
 * `pyyaml` is used to generate schema into YAML-based OpenAPI format.
 * `uritemplate` is used internally to get parameters in path.
+* `inflection` is used to pluralize operations more appropriately in the list endpoints.
 
 ### Generating a static schema with the `generateschema` management command
 
@@ -77,11 +95,13 @@ urlpatterns = [
     # Use the `get_schema_view()` helper to add a `SchemaView` to project URLs.
     #   * `title` and `description` parameters are passed to `SchemaGenerator`.
     #   * Provide view name for use with `reverse()`.
-    path('openapi', get_schema_view(
-        title="Your Project",
-        description="API for all things …",
-        version="1.0.0"
-    ), name='openapi-schema'),
+    path(
+        "openapi",
+        get_schema_view(
+            title="Your Project", description="API for all things …", version="1.0.0"
+        ),
+        name="openapi-schema",
+    ),
     # ...
 ]
 ```
@@ -122,6 +142,7 @@ The `get_schema_view()` helper takes the following keyword arguments:
             url='https://www.example.org/api/',
             patterns=schema_url_patterns,
         )
+* `public`: May be used to specify if schema should bypass views permissions. Default to False
 
 * `generator_class`: May be used to specify a `SchemaGenerator` subclass to be
   passed to the `SchemaView`.
@@ -165,7 +186,7 @@ In order to customize the top-level schema, subclass
 as an argument to the `generateschema` command or `get_schema_view()` helper
 function.
 
-### get_schema(self, request)
+### get_schema(self, request=None, public=False)
 
 Returns a dictionary that represents the OpenAPI schema:
 
@@ -241,11 +262,13 @@ class CustomSchema(AutoSchema):
     """
     AutoSchema subclass using schema_extra_info on the view.
     """
+
     ...
+
 
 class CustomView(APIView):
     schema = CustomSchema()
-    schema_extra_info = ... some extra info ...
+    schema_extra_info = ...  # some extra info
 ```
 
 Here, the `AutoSchema` subclass goes looking for `schema_extra_info` on the
@@ -260,10 +283,13 @@ class BaseSchema(AutoSchema):
     """
     AutoSchema subclass that knows how to use extra_info.
     """
+
     ...
 
+
 class CustomSchema(BaseSchema):
-    extra_info = ... some extra info ...
+    extra_info = ...  # some extra info
+
 
 class CustomView(APIView):
     schema = CustomSchema()
@@ -284,15 +310,14 @@ class CustomSchema(BaseSchema):
         self.extra_info = kwargs.pop("extra_info")
         super().__init__(**kwargs)
 
+
 class CustomView(APIView):
-    schema = CustomSchema(
-        extra_info=... some extra info ...
-    )
+    schema = CustomSchema(extra_info=...)  # some extra info
 ```
 
 This saves you having to create a custom subclass per-view for a commonly used option.
 
-Not all `AutoSchema` methods expose related  `__init__()` kwargs, but those for
+Not all `AutoSchema` methods expose related `__init__()` kwargs, but those for
 the more commonly needed options do.
 
 ### `AutoSchema` methods
@@ -300,7 +325,7 @@ the more commonly needed options do.
 #### `get_components()`
 
 Generates the OpenAPI components that describe request and response bodies,
-deriving  their properties from the serializer.
+deriving their properties from the serializer.
 
 Returns a dictionary mapping the component name to the generated
 representation. By default this has just a single pair but you may override
@@ -312,6 +337,11 @@ serializers.
 Computes the component's name from the serializer.
 
 You may see warnings if your API has duplicate component names. If so you can override `get_component_name()` or pass the `component_name` `__init__()` kwarg (see below) to provide different names.
+
+#### `get_reference()`
+
+Returns a reference to the serializer component. This may be useful if you override `get_schema()`.
+
 
 #### `map_serializer()`
 
@@ -375,6 +405,20 @@ operationIds.
 In order to work around this, you can override `get_operation_id_base()` to
 provide a different base for name part of the ID.
 
+#### `get_serializer()`
+
+If the view has implemented `get_serializer()`, returns the result.
+
+#### `get_request_serializer()`
+
+By default returns `get_serializer()` but can be overridden to
+differentiate between request and response objects.
+
+#### `get_response_serializer()`
+
+By default returns `get_serializer()` but can be overridden to
+differentiate between request and response objects.
+
 ### `AutoSchema.__init__()` kwargs
 
 `AutoSchema` provides a number of `__init__()` kwargs that can be used for
@@ -407,6 +451,7 @@ If your views have related customizations that are needed frequently, you can
 create a base `AutoSchema` subclass for your project that takes additional
 `__init__()` kwargs to save subclassing `AutoSchema` for each view.
 
+[cite]: https://blog.heroku.com/archives/2014/1/8/json_schema_for_heroku_platform_api
 [openapi]: https://github.com/OAI/OpenAPI-Specification
 [openapi-specification-extensions]: https://github.com/OAI/OpenAPI-Specification/blob/master/versions/3.0.2.md#specification-extensions
 [openapi-operation]: https://github.com/OAI/OpenAPI-Specification/blob/master/versions/3.0.2.md#operationObject
@@ -417,3 +462,4 @@ create a base `AutoSchema` subclass for your project that takes additional
 [openapi-generator]: https://github.com/OpenAPITools/openapi-generator
 [swagger-codegen]: https://github.com/swagger-api/swagger-codegen
 [info-object]: https://swagger.io/specification/#infoObject
+[drf-spectacular]: https://drf-spectacular.readthedocs.io/en/latest/readme.html
